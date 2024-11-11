@@ -1,13 +1,21 @@
 package com.example;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public class InterestRateImpact {
 
@@ -15,6 +23,23 @@ public class InterestRateImpact {
 
         private Text interestRateRange = new Text();
         private Text flow = new Text();
+        private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd", Locale.ENGLISH);
+        private Map<String, Double> interestRates = new HashMap<>();
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            Configuration conf = context.getConfiguration();
+            Path path = new Path(conf.get("interest.rate.path"));
+            FileSystem fs = FileSystem.get(conf);
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(path)));
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+                if (fields.length < 2) continue;
+                interestRates.put(fields[0], Double.parseDouble(fields[1])); // Assuming the date is in the first column and the interest rate is in the second column
+            }
+            br.close();
+        }
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String[] fields = value.toString().split(",");
@@ -24,7 +49,6 @@ public class InterestRateImpact {
             String totalPurchaseAmt = fields[4].isEmpty() ? "0" : fields[4];
             String totalRedeemAmt = fields[10].isEmpty() ? "0" : fields[10];
 
-            // 假设我们有一个方法getInterestRateRange来获取利率区间
             String interestRate = getInterestRateRange(reportDate);
             interestRateRange.set(interestRate);
             flow.set(totalPurchaseAmt + "," + totalRedeemAmt);
@@ -32,9 +56,12 @@ public class InterestRateImpact {
         }
 
         private String getInterestRateRange(String date) {
-            // 这里应该实现根据日期获取利率区间的逻辑
-            // 例如：根据日期查询mfd_bank_shibor表并返回对应的利率区间
-            return "2.5-3.0%"; // 示例返回值
+            Double rate = interestRates.get(date);
+            if (rate == null) return "Unknown";
+            if (rate < 3.0) return "0-3.0%";
+            else if (rate < 4.0) return "3.0-4.0%";
+            else if (rate < 5.0) return "4.0-5.0%";
+            else return "5.0%+";
         }
     }
 
@@ -64,6 +91,7 @@ public class InterestRateImpact {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
+        conf.set("interest.rate.path", args[2]); // Path to the interest rate file
         Job job = Job.getInstance(conf, "interest rate impact");
         job.setJarByClass(InterestRateImpact.class);
         job.setMapperClass(TokenizerMapper.class);

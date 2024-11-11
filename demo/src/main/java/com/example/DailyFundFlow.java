@@ -8,7 +8,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
 
-public class run {
+public class DailyFundFlow {
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, Text> {
 
