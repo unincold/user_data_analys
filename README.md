@@ -1,6 +1,6 @@
 # user_data_analys
 
-
+```bash
 .
 ├── README.md
 ├── demo #编译成的jar包
@@ -25,7 +25,8 @@
 ├── pom.xml
 └── target #编译目录
 
-'''
+```
+\
 输出结果详见output
 
 # 任务1：
